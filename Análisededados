@@ -1,0 +1,103 @@
+pip install mysql-connector-python prettytable
+import mysql.connector
+from prettytable import PrettyTable
+
+# Configuração da conexão com o banco de dados MySQL
+conn = mysql.connector.connect(
+    host="localhost",
+    user="seu_usuario",
+    password="sua_senha",
+    database="loja_de_roupas"
+)
+
+cursor = conn.cursor()
+
+# Função para criar tabelas
+def criar_tabelas():
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS produtos (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        nome VARCHAR(100),
+        quantidade INT,
+        preco DECIMAL(10, 2)
+    )
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS vendas (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        produto_id INT,
+        quantidade_vendida INT,
+        data_venda DATE,
+        FOREIGN KEY (produto_id) REFERENCES produtos(id)
+    )
+    """)
+
+    print("Tabelas criadas com sucesso.")
+
+# Função para cadastrar novos produtos
+def cadastrar_produto(nome, quantidade, preco):
+    cursor.execute("INSERT INTO produtos (nome, quantidade, preco) VALUES (%s, %s, %s)", (nome, quantidade, preco))
+    conn.commit()
+    print(f"Produto {nome} cadastrado com sucesso.")
+
+# Função para registrar uma venda
+def registrar_venda(produto_id, quantidade_vendida, data_venda):
+    cursor.execute("SELECT quantidade FROM produtos WHERE id = %s", (produto_id,))
+    quantidade_atual = cursor.fetchone()[0]
+
+    if quantidade_atual >= quantidade_vendida:
+        cursor.execute("INSERT INTO vendas (produto_id, quantidade_vendida, data_venda) VALUES (%s, %s, %s)", 
+                       (produto_id, quantidade_vendida, data_venda))
+        cursor.execute("UPDATE produtos SET quantidade = quantidade - %s WHERE id = %s", 
+                       (quantidade_vendida, produto_id))
+        conn.commit()
+        print(f"Venda registrada com sucesso.")
+    else:
+        print("Estoque insuficiente para realizar a venda.")
+
+# Função para exibir o estoque atual
+def exibir_estoque():
+    cursor.execute("SELECT * FROM produtos")
+    produtos = cursor.fetchall()
+
+    tabela = PrettyTable(["ID", "Nome", "Quantidade", "Preço"])
+    for produto in produtos:
+        tabela.add_row(produto)
+    
+    print(tabela)
+
+# Função para exibir o histórico de vendas
+def exibir_vendas():
+    cursor.execute("""
+    SELECT v.id, p.nome, v.quantidade_vendida, v.data_venda 
+    FROM vendas v
+    JOIN produtos p ON v.produto_id = p.id
+    """)
+    vendas = cursor.fetchall()
+
+    tabela = PrettyTable(["ID da Venda", "Produto", "Quantidade Vendida", "Data da Venda"])
+    for venda in vendas:
+        tabela.add_row(venda)
+    
+    print(tabela)
+
+# Exemplo de uso das funções
+criar_tabelas()
+
+# Cadastro de produtos (exemplo)
+cadastrar_produto("Camiseta", 50, 29.99)
+cadastrar_produto("Calça Jeans", 20, 89.99)
+
+# Registro de venda (exemplo)
+registrar_venda(1, 5, "2024-08-22")
+
+# Exibir o estoque atual
+exibir_estoque()
+
+# Exibir o histórico de vendas
+exibir_vendas()
+
+# Fechar a conexão
+cursor.close()
+conn.close()
